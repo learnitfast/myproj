@@ -1,0 +1,77 @@
+// === Aircraft ===
+CREATE (:Aircraft {id: 'N123AB', model: 'B737-800', tailNumber: 'N123AB', manufacturerSerialNumber: 'MSN9876', status: 'In Service', lastMaintenanceDate: date('2025-06-01'), maxSeating: 162});
+CREATE (:Aircraft {id: 'N456CD', model: 'A320-200', tailNumber: 'N456CD', manufacturerSerialNumber: 'MSN6543', status: 'Maintenance', lastMaintenanceDate: date('2025-08-20'), maxSeating: 180});
+
+// === Flight ===
+CREATE (:Flight {id: 'BAW123', flightNumber: 'BA123', scheduledDeparture: datetime('2025-09-03T08:30:00Z'), scheduledArrival: datetime('2025-09-03T11:45:00Z'), status: 'Scheduled', aircraftId: 'N123AB', originAirport: 'LHR', destinationAirport: 'JFK'});
+CREATE (:Flight {id: 'AF456', flightNumber: 'AF456', scheduledDeparture: datetime('2025-09-04T09:10:00Z'), scheduledArrival: datetime('2025-09-04T12:40:00Z'), status: 'Scheduled', aircraftId: 'N456CD', originAirport: 'CDG', destinationAirport: 'LHR'});
+
+// === Airport ===
+CREATE (:Airport {id: 'LHR', name: 'London Heathrow', city: 'London', country: 'UK', latitude: 51.47, longitude: -0.4543, timezone: 'Europe/London'});
+CREATE (:Airport {id: 'JFK', name: 'John F. Kennedy Intl', city: 'New York', country: 'USA', latitude: 40.6413, longitude: -73.7781, timezone: 'America/New_York'});
+CREATE (:Airport {id: 'CDG', name: 'Charles de Gaulle', city: 'Paris', country: 'France', latitude: 49.0097, longitude: 2.5479, timezone: 'Europe/Paris'});
+
+// === CrewMember ===
+CREATE (:CrewMember {id: 'CM001', name: 'Alice Taylor', role: 'Captain', licenseNumber: 'PL-2023-001', baseAirport: 'LHR'});
+CREATE (:CrewMember {id: 'CM002', name: 'Bob Johnson', role: 'First Officer', licenseNumber: 'PL-2023-002', baseAirport: 'CDG'});
+
+// === MaintenanceEvent ===
+CREATE (:MaintenanceEvent {id: 'ME1001', aircraftId: 'N123AB', type: 'A-Check', reportedAt: datetime('2025-08-31T14:10:00Z'), completedAt: datetime('2025-09-01T09:00:00Z'), notes: 'Replaced hydraulic pump #2.'});
+
+// === Passenger ===
+CREATE (:Passenger {id: 'P001', name: 'John Smith', frequentFlyerNo: 'BAFF12345', nationality: 'USA'});
+CREATE (:Passenger {id: 'P002', name: 'Marie Curie', frequentFlyerNo: 'AF9999', nationality: 'France'});
+CREATE (:Passenger {id: 'P003', name: 'David Beckham', frequentFlyerNo: 'None', nationality: 'UK'});
+
+// === Booking ===
+CREATE (:Booking {id: 'BK001', passengerId: 'P001', flightId: 'BAW123', seat: '14A', bookingStatus: 'Confirmed', fareClass: 'Economy'});
+CREATE (:Booking {id: 'BK002', passengerId: 'P002', flightId: 'AF456', seat: '12C', bookingStatus: 'Checked-in', fareClass: 'Business'});
+
+// Aircraft operates Flights
+MATCH (a:Aircraft {id:'N123AB'}), (f:Flight {id:'BAW123'})
+CREATE (a)-[:OPERATES {assignmentTime: datetime('2025-09-01T12:00:00Z')}]->(f);
+
+MATCH (a:Aircraft {id:'N456CD'}), (f:Flight {id:'AF456'})
+CREATE (a)-[:OPERATES {assignmentTime: datetime('2025-09-02T08:00:00Z')}]->(f);
+
+// Flight departures & arrivals
+MATCH (f:Flight {id:'BAW123'}), (a:Airport {id:'LHR'})
+CREATE (f)-[:DEPARTS_FROM {gate: 'A10'}]->(a);
+MATCH (f:Flight {id:'BAW123'}), (a:Airport {id:'JFK'})
+CREATE (f)-[:ARRIVES_AT {gate: '7'}]->(a);
+
+MATCH (f:Flight {id:'AF456'}), (a:Airport {id:'CDG'})
+CREATE (f)-[:DEPARTS_FROM {gate: 'B5'}]->(a);
+MATCH (f:Flight {id:'AF456'}), (a:Airport {id:'LHR'})
+CREATE (f)-[:ARRIVES_AT {gate: '22'}]->(a);
+
+// Crew assigned to flights
+MATCH (c:CrewMember {id:'CM001'}), (f:Flight {id:'BAW123'})
+CREATE (c)-[:ASSIGNED_TO {role: 'Captain', assignedOn: datetime('2025-09-01T15:00:00Z')}]->(f);
+MATCH (c:CrewMember {id:'CM002'}), (f:Flight {id:'AF456'})
+CREATE (c)-[:ASSIGNED_TO {role: 'First Officer', assignedOn: datetime('2025-09-02T10:00:00Z')}]->(f);
+
+// Maintenance
+MATCH (a:Aircraft {id:'N123AB'}), (m:MaintenanceEvent {id:'ME1001'})
+CREATE (a)-[:HAS_MAINTENANCE_EVENT {severity: 'Medium'}]->(m);
+
+// Passenger bookings
+MATCH (p:Passenger {id:'P001'}), (b:Booking {id:'BK001'})
+CREATE (p)-[:HAS_BOOKING {createdAt: datetime('2025-08-20T12:00:00Z')}]->(b);
+MATCH (p:Passenger {id:'P002'}), (b:Booking {id:'BK002'})
+CREATE (p)-[:HAS_BOOKING {createdAt: datetime('2025-08-22T14:30:00Z')}]->(b);
+
+// Booking for flight
+MATCH (b:Booking {id:'BK001'}), (f:Flight {id:'BAW123'})
+CREATE (b)-[:FOR_FLIGHT {price: 450.0, currency: 'USD'}]->(f);
+MATCH (b:Booking {id:'BK002'}), (f:Flight {id:'AF456'})
+CREATE (b)-[:FOR_FLIGHT {price: 1200.0, currency: 'EUR'}]->(f);
+
+
+CREATE CONSTRAINT aircraft_id IF NOT EXISTS FOR (a:Aircraft) REQUIRE a.id IS UNIQUE;
+CREATE CONSTRAINT flight_id IF NOT EXISTS FOR (f:Flight) REQUIRE f.id IS UNIQUE;
+CREATE CONSTRAINT airport_id IF NOT EXISTS FOR (a:Airport) REQUIRE a.id IS UNIQUE;
+CREATE CONSTRAINT crew_id IF NOT EXISTS FOR (c:CrewMember) REQUIRE c.id IS UNIQUE;
+CREATE CONSTRAINT maint_id IF NOT EXISTS FOR (m:MaintenanceEvent) REQUIRE m.id IS UNIQUE;
+CREATE CONSTRAINT passenger_id IF NOT EXISTS FOR (p:Passenger) REQUIRE p.id IS UNIQUE;
+CREATE CONSTRAINT booking_id IF NOT EXISTS FOR (b:Booking) REQUIRE b.id IS UNIQUE;
